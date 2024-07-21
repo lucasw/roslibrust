@@ -19,7 +19,7 @@ pub struct Time {
 }
 
 impl Time {
-    fn seconds(&self) -> f64 {
+    pub fn seconds(&self) -> f64 {
         f64::from(self.secs) + f64::from(self.nsecs) / 1e9
     }
 }
@@ -106,6 +106,24 @@ impl Add<Duration> for Time {
             return Self {secs: 0, nsecs: 0};
         }
         Self {
+            secs: secs as u32,
+            nsecs: nsecs as u32,
+        }
+    }
+}
+
+impl Sub<Duration> for Time {
+    type Output = Time;
+    fn sub(self, rhs: Duration) -> Time {
+        let nsec_diff = self.nsecs as i64 - rhs.nsec as i64;
+        let secs = self.secs as i64 - rhs.sec as i64 + nsec_diff / 1_000_000_000;
+        let nsecs = nsec_diff.rem_euclid(1_000_000_000);
+
+        if secs < 0 {
+            // TODO(lucasw) return an error
+            return Self {secs: 0, nsecs: 0};
+        }
+        Time {
             secs: secs as u32,
             nsecs: nsecs as u32,
         }
