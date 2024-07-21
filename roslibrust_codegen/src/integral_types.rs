@@ -1,4 +1,5 @@
 use crate::RosMessageType;
+use std::ops::Add;
 
 /// Matches the integral ros1 type time, with extensions for ease of use
 /// NOTE: in ROS1 "Time" is not a message in and of itself and std_msgs/Time should be used.
@@ -56,6 +57,22 @@ impl From<tokio::time::Duration> for Duration {
         Duration {
             sec: downcast_sec,
             nsec: downcast_nsec,
+        }
+    }
+}
+
+impl Add<Duration> for Time {
+    type Output = Time;
+    fn add(self, rhs: Duration) -> Self {
+        let secs = self.secs as i64 + rhs.sec as i64 + (self.nsecs as i64 + rhs.nsec as i64) / 1_000_000_000;
+        let nsecs = (self.nsecs as i64 + rhs.nsec as i64).rem_euclid(1_000_000_000);
+        if secs < 0 {
+            // TODO(lucasw) return an error
+            return Self {secs: 0, nsecs: 0};
+        }
+        Self {
+            secs: secs as u32,
+            nsecs: nsecs as u32,
         }
     }
 }
