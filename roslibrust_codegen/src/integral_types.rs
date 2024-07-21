@@ -1,10 +1,11 @@
 use crate::RosMessageType;
-use std::ops::Add;
+use std::ops::{Add, Sub};
+use std::cmp::Ordering::{Equal, Greater, Less};
 
 /// Matches the integral ros1 type time, with extensions for ease of use
 /// NOTE: in ROS1 "Time" is not a message in and of itself and std_msgs/Time should be used.
 /// However, in ROS2 "Time" is a message and part of builtin_interfaces/Time.
-#[derive(:: serde :: Deserialize, :: serde :: Serialize, Debug, Default, Clone, PartialEq)]
+#[derive(:: serde :: Deserialize, :: serde :: Serialize, Debug, Default, Clone, Eq, PartialEq)]
 pub struct Time {
     // Note: rosbridge appears to accept secs and nsecs in for time without issue?
     // Not sure we should actually rely on this behavior, but ok for now...
@@ -15,6 +16,39 @@ pub struct Time {
     // This alias is required for ros2 where field has been renamed
     #[serde(alias = "nanosec")]
     pub nsecs: u32,
+}
+
+impl Time {
+    fn seconds(&self) -> f64 {
+        f64::from(self.secs) + f64::from(self.nsecs) / 1e9
+    }
+}
+
+impl PartialOrd for Time {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        if self.seconds() == other.seconds() {
+            return Some(Equal);
+        } else if self.seconds() > other.seconds() {
+            return Some(Greater);
+        }
+        return Some(Less);
+    }
+
+    fn lt(&self, other: &Self) -> bool {
+        self.seconds().lt(&other.seconds())
+    }
+
+    fn le(&self, other: &Self) -> bool {
+        self.seconds().le(&other.seconds())
+    }
+
+    fn gt(&self, other: &Self) -> bool {
+        self.seconds().gt(&other.seconds())
+    }
+
+    fn ge(&self, other: &Self) -> bool {
+        self.seconds().ge(&other.seconds())
+    }
 }
 
 impl From<std::time::SystemTime> for Time {
@@ -64,8 +98,9 @@ impl From<tokio::time::Duration> for Duration {
 impl Add<Duration> for Time {
     type Output = Time;
     fn add(self, rhs: Duration) -> Self {
-        let secs = self.secs as i64 + rhs.sec as i64 + (self.nsecs as i64 + rhs.nsec as i64) / 1_000_000_000;
-        let nsecs = (self.nsecs as i64 + rhs.nsec as i64).rem_euclid(1_000_000_000);
+        let nsec_sum = self.nsecs as i64 + rhs.nsec as i64;
+        let secs = self.secs as i64 + rhs.sec as i64 + nsec_sum / 1_000_000_000;
+        let nsecs = nsec_sum.rem_euclid(1_000_000_000);
         if secs < 0 {
             // TODO(lucasw) return an error
             return Self {secs: 0, nsecs: 0};
@@ -73,6 +108,20 @@ impl Add<Duration> for Time {
         Self {
             secs: secs as u32,
             nsecs: nsecs as u32,
+        }
+    }
+}
+
+impl Sub<Time> for Time {
+    type Output = Duration;
+    fn sub(self, rhs: Time) -> Duration {
+        let nsec_diff = self.nsecs as i64 - rhs.nsecs as i64;
+        let secs = self.secs as i64 - rhs.secs as i64 + nsec_diff / 1_000_000_000;
+        let nsecs = nsec_diff.rem_euclid(1_000_000_000);
+
+        Duration {
+            sec: secs as i32,
+            nsec: nsecs as i32,
         }
     }
 }
