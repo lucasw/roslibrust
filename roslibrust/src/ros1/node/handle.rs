@@ -58,10 +58,11 @@ impl NodeHandle {
         &self,
         topic_name: &str,
         queue_size: usize,
+        latch: bool,
     ) -> Result<Publisher<T>, NodeError> {
         let sender = self
             .inner
-            .register_publisher::<T>(topic_name, queue_size)
+            .register_publisher::<T>(topic_name, queue_size, latch)
             .await?;
         Ok(Publisher::new(topic_name, sender))
     }

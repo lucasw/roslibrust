@@ -47,6 +47,7 @@ pub enum NodeMsg {
         queue_size: usize,
         msg_definition: String,
         md5sum: String,
+        latch: bool,
     },
     RegisterSubscriber {
         reply: oneshot::Sender<Result<broadcast::Receiver<Vec<u8>>, String>>,
@@ -158,6 +159,7 @@ impl NodeServerHandle {
         &self,
         topic: &str,
         queue_size: usize,
+        latch: bool,
     ) -> Result<mpsc::Sender<Vec<u8>>, NodeError> {
         let (sender, receiver) = oneshot::channel();
         self.node_server_sender.send(NodeMsg::RegisterPublisher {
@@ -167,6 +169,7 @@ impl NodeServerHandle {
             queue_size,
             msg_definition: T::DEFINITION.to_owned(),
             md5sum: T::MD5SUM.to_owned(),
+            latch,
         })?;
         let received = receiver.await?;
         Ok(received.map_err(|_err| {
@@ -455,9 +458,10 @@ impl Node {
                 queue_size,
                 msg_definition,
                 md5sum,
+                latch,
             } => {
                 let res = self
-                    .register_publisher(topic, &topic_type, queue_size, msg_definition, md5sum)
+                    .register_publisher(topic, &topic_type, queue_size, msg_definition, md5sum, latch)
                     .await;
                 match res {
                     Ok(handle) => reply.send(Ok(handle)),
@@ -607,6 +611,7 @@ impl Node {
         queue_size: usize,
         msg_definition: String,
         md5sum: String,
+        latch: bool,
     ) -> Result<mpsc::Sender<Vec<u8>>, NodeError> {
         let existing_entry = {
             self.publishers.iter().find_map(|(key, value)| {
@@ -629,7 +634,7 @@ impl Node {
         } else {
             let channel = Publication::new(
                 &self.node_name,
-                false,
+                latch,
                 &topic,
                 self.host_addr,
                 queue_size,
@@ -644,7 +649,7 @@ impl Node {
             })?;
             let handle = channel.get_sender();
             self.publishers.insert(topic.clone(), channel);
-            let _current_subscribers = self.client.register_publisher(&topic, topic_type).await?;
+            let _current_subscribers = self.client.register_publisher(&topic, topic_type /*, latch */).await?;
             Ok(handle)
         }
     }

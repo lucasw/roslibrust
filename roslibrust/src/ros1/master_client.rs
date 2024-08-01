@@ -244,7 +244,9 @@ impl MasterClient {
         &self,
         topic: impl Into<String>,
         topic_type: impl Into<String>,
+        // _latch: bool,
     ) -> Result<Vec<String>, RosMasterError> {
+        // TODO(lucasw) can latch go into this?
         let body = serde_xmlrpc::request_to_string(
             "registerPublisher",
             vec![
@@ -447,7 +449,7 @@ mod test {
         // Register publisher
         let topic = "/my_topic";
         let topic_type = "std_msgs/String";
-        client.register_publisher(topic, topic_type).await.unwrap();
+        client.register_publisher(topic, topic_type, false).await.unwrap();
 
         // Use system state to verify we are registered as a publisher
         let state = client.get_system_state().await.unwrap();
