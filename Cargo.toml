@@ -1,8 +1,8 @@
 [workspace]
 
 members = [
-    "example_package",
-    "example_package_macro",
+    # "example_package",
+    # "example_package_macro",
     "roslibrust",
     "roslibrust_codegen",
     "roslibrust_codegen_macro",

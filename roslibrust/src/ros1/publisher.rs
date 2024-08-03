@@ -53,6 +53,8 @@ pub struct Publication {
     _channel_task: ChildTask<()>,
     _publish_task: ChildTask<()>,
     publish_sender: mpsc::Sender<Vec<u8>>,
+    latching: bool,
+    // last_published: Arc<RwLock<Option<Vec<u8>>>>,
 }
 
 impl Publication {
@@ -69,6 +71,10 @@ impl Publication {
         let host_addr = SocketAddr::from((host_addr, 0));
         let tcp_listener = tokio::net::TcpListener::bind(host_addr).await?;
         let listener_port = tcp_listener.local_addr().unwrap().port();
+
+        let last_published = Arc::new(RwLock::new(None::<Vec<u8>>));
+        let last_published_read_copy = last_published.clone();
+        let last_published_write_copy = last_published.clone();
 
         let (sender, mut receiver) = mpsc::channel::<Vec<u8>>(queue_size);
 
@@ -146,6 +152,19 @@ impl Publication {
                         .write(&response_header_bytes[..])
                         .await
                         .expect("Unable to respond on tcpstream");
+
+                    if latching {
+                        match last_published_read_copy.read().await.clone() {
+                            Some(msg_to_publish) => {
+                                println!("writing latched message");
+                                if let Err(err) = stream.write(&msg_to_publish[..]).await {
+                                    log::debug!("Failed to send data to subscriber: {err}, removing");
+                                }
+                            },
+                            None => {},
+                        }
+                    }
+
                     let mut wlock = subscriber_streams.write().await;
                     wlock.push(stream);
                     log::debug!(
@@ -178,6 +197,9 @@ impl Publication {
                                 streams.remove(stream_idx - removed_cnt);
                             },
                         );
+                        if latching {
+                            *last_published_write_copy.write().await = Some(msg_to_publish);
+                        }
                     }
                     None => {
                         log::debug!("No more senders for the publisher channel, exiting...");
@@ -193,6 +215,8 @@ impl Publication {
             listener_port,
             publish_sender: sender,
             _publish_task: publish_task.into(),
+            latching,
+            // last_published,
         })
     }
 

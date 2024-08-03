@@ -203,12 +203,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "89b2fd2a0dcf38d7971e2194b6b6eebab45ae01067456a7fd93d5547a61b70be"
 
 [[package]]
-name = "cargo-emit"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1582e1c9e755dd6ad6b224dcffb135d199399a4568d454bd89fe515ca8425695"
-
-[[package]]
 name = "cc"
 version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -474,22 +468,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d9435d864e017c3c6afeac1654189b06cdb491cf2ff73dbf0d73b0f292f42ff8"
 dependencies = [
  "backtrace",
-]
-
-[[package]]
-name = "example_package"
-version = "0.1.0"
-dependencies = [
- "cargo-emit",
- "roslibrust_codegen",
-]
-
-[[package]]
-name = "example_package_macro"
-version = "0.1.0"
-dependencies = [
- "roslibrust_codegen",
- "roslibrust_codegen_macro",
 ]
 
 [[package]]
