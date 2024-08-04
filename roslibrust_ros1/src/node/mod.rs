@@ -12,11 +12,11 @@ use std::{
 pub(crate) mod actor;
 mod handle;
 mod xmlrpc;
-use actor::*;
+pub use actor::*;
 use anyhow::anyhow;
 pub use handle::NodeHandle;
 use tokio::sync::{mpsc, oneshot};
-use xmlrpc::*;
+pub use xmlrpc::*;
 
 #[derive(Debug)]
 pub struct ProtocolParams {
@@ -29,7 +29,7 @@ pub struct ProtocolParams {
 /// Following ROS's idiomatic address rules uses ROS_HOSTNAME and ROS_IP to determine the address that server should be hosted at.
 /// Returns both the resolved IpAddress of the host (used for actually opening the socket), and the String "hostname" which should
 /// be used in the URI.
-async fn determine_addr() -> Result<(Ipv4Addr, String), RosMasterError> {
+pub async fn determine_addr() -> Result<(Ipv4Addr, String), RosMasterError> {
     // If ROS_IP is set that trumps anything else
     if let Ok(ip_str) = std::env::var("ROS_IP") {
         let ip = ip_str.parse().map_err(|e| {

@@ -93,12 +93,12 @@ pub enum NodeMsg {
 /// Things that need to interact with the node server do so through a command channel
 /// Some handles are "root" handles that when dropped also drop the node server.
 #[derive(Clone)]
-pub(crate) struct NodeServerHandle {
-    pub(crate) node_server_sender: mpsc::UnboundedSender<NodeMsg>,
+pub struct NodeServerHandle {
+    pub node_server_sender: mpsc::UnboundedSender<NodeMsg>,
     // If this handle should keep the underlying node task alive it will hold an
     // Arc to the underlying node task. This is an option because internal handles
     // within the node shouldn't keep it alive (e.g. what we hand to xml server)
-    pub(crate) _node_task: Option<Arc<ChildTask<()>>>,
+    pub _node_task: Option<Arc<ChildTask<()>>>,
 }
 
 impl NodeServerHandle {
