@@ -30,9 +30,9 @@ impl RosXmlStatusCode {
 /// Is also called by other ros nodes to initiate point to point connections.
 /// Note: ROS uses "master/slave" terminology here. We continue to refer to the ROS central server as the ROS master,
 /// but are intentionally using "XmlRpcServer" in place of where ROS says "Slave API"
-pub(crate) struct XmlRpcServer {}
+pub struct XmlRpcServer {}
 
-pub(crate) struct XmlRpcServerHandle {
+pub struct XmlRpcServerHandle {
     port: u16,
     _handle: ChildTask<()>,
 }

@@ -88,12 +88,12 @@ pub enum NodeMsg {
 }
 
 #[derive(Clone)]
-pub(crate) struct NodeServerHandle {
-    pub(crate) node_server_sender: mpsc::UnboundedSender<NodeMsg>,
+pub struct NodeServerHandle {
+    pub node_server_sender: mpsc::UnboundedSender<NodeMsg>,
     // If this handle should keep the underlying node task alive it will hold an
     // Arc to the underlying node task. This is an option because internal handles
     // within the node shouldn't keep it alive (e.g. what we hand to xml server)
-    _node_task: Option<Arc<ChildTask<()>>>,
+    pub _node_task: Option<Arc<ChildTask<()>>>,
 }
 
 impl NodeServerHandle {
