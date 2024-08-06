@@ -26,12 +26,25 @@ impl<T: RosMessageType> Subscriber<T> {
         }
     }
 
+    // TODO(lucasw) have to call next_raw in order to get raw bytes from an Any
+    // subscription type, trying to run deserialization on it will/should fail
+    pub async fn next_raw(&mut self) -> Option<Result<Vec<u8>, SubscriberError>> {
+        let data = match self.receiver.recv().await {
+            Ok(v) => v,
+            Err(RecvError::Closed) => return None,
+            Err(RecvError::Lagged(n)) => return Some(Err(SubscriberError::Lagged(n))),
+        };
+
+        Some(Ok(data))
+    }
+
     pub async fn next(&mut self) -> Option<Result<T, SubscriberError>> {
         let data = match self.receiver.recv().await {
             Ok(v) => v,
             Err(RecvError::Closed) => return None,
             Err(RecvError::Lagged(n)) => return Some(Err(SubscriberError::Lagged(n))),
         };
+
         match serde_rosmsg::from_slice::<T>(&data[..]) {
             Ok(p) => Some(Ok(p)),
             Err(e) => Some(Err(e.into())),
@@ -154,7 +167,7 @@ async fn establish_publisher_connection(
     stream.write_all(&conn_header_bytes[..]).await?;
 
     if let Ok(responded_header) = tcpros::receive_header(&mut stream).await {
-        if conn_header.md5sum == responded_header.md5sum {
+        if conn_header.md5sum == Some("*".to_string()) || conn_header.md5sum == responded_header.md5sum {
             log::debug!(
                 "Established connection with publisher for {:?}",
                 conn_header.topic

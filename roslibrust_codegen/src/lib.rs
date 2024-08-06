@@ -709,6 +709,7 @@ fn parse_ros_files(
             }
             "msg" => {
                 let msg = parse_ros_message_file(&contents, name, &pkg, &path)?;
+                // println!("{}/{name}", pkg.name);
                 parsed_messages.push(msg);
             }
             "action" => {

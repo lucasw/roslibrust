@@ -279,6 +279,47 @@ impl NodeServerHandle {
         })
     }
 
+    // pub async fn register_subscriber_any<T: RosMessageType>(
+    pub async fn register_subscriber_any(
+        &self,
+        topic: &str,
+        topic_type: &str,
+        queue_size: usize,
+    ) -> Result<broadcast::Receiver<Vec<u8>>, NodeError> {
+        let (sender, receiver) = oneshot::channel();
+
+        // TODO(lucasw) use and check for a magic ShapeShifter/AnyMsg message type
+        /*
+        {
+            let ros_message_type: Vec<&str> = std::any::type_name::<T>().split("::").collect();
+            println!("subscriber type: {:?}", ros_message_type);
+            let is_any_msg = ros_message_type[1] == "std_msgs" && ros_message_type[2] == "ByteMultiArray";
+            if !is_any_msg {
+                log::error!("can only subscribe any with std_msgs::ByteMultiArray not {ros_message_type:?}");
+                return Err(NodeError::IoError(io::Error::from(io::ErrorKind::ConnectionAborted)));
+            }
+        }
+        */
+
+        println!("trying to subscribe to any message type {topic} {topic_type}");
+        self.node_server_sender.send(NodeMsg::RegisterSubscriber {
+            reply: sender,
+            topic: topic.to_owned(),
+            // TODO(lucasw) don't need topic_type here after all, could merge this with regular
+            // register_subscriber and have logic for the special AnyMsg type
+            topic_type: "*".to_string(),  // topic_type.to_owned(),
+            queue_size,
+            msg_definition: "".to_string(),
+            md5sum: "*".to_string(),
+        })?;
+
+        let received = receiver.await?;
+        Ok(received.map_err(|err| {
+            log::error!("Failed to register subscriber: {err}");
+            NodeError::IoError(io::Error::from(io::ErrorKind::ConnectionAborted))
+        })?)
+    }
+
     /// Registers a subscription with the underlying node server
     /// If this is the first time the given topic has been subscribed to (by this node)
     /// rosmaster will be informed.
@@ -291,6 +332,7 @@ impl NodeServerHandle {
         // Type here is complicated, this is a channel that we're sending a channel receiver over
         // This channel is used to fire back the receiver of the underlying subscription
         let (sender, receiver) = oneshot::channel();
+
         self.node_server_sender.send(NodeMsg::RegisterSubscriber {
             reply: sender,
             topic: topic.to_owned(),
@@ -299,6 +341,7 @@ impl NodeServerHandle {
             msg_definition: T::DEFINITION.to_owned(),
             md5sum: T::MD5SUM.to_owned(),
         })?;
+
         let received = receiver.await?;
         Ok(received.map_err(|err| {
             log::error!("Failed to register subscriber: {err}");

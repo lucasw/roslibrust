@@ -75,6 +75,22 @@ impl NodeHandle {
         Ok(Publisher::new(topic_name, sender))
     }
 
+    // TODO(lucasw) I think any type works here, which isn't ideal, maybe
+    // should force caller to use a magic AnyMsg/ShapeShifter type
+    pub async fn subscribe_any<T: roslibrust_codegen::RosMessageType>(
+        &self,
+        topic_name: &str,
+        topic_type: &str,
+        queue_size: usize,
+    ) -> Result<Subscriber<T>, NodeError> {
+        let receiver = self
+            .inner
+            // .register_subscriber_any::<T>(topic_name, topic_type, queue_size)
+            .register_subscriber_any(topic_name, topic_type, queue_size)
+            .await?;
+        Ok(Subscriber::new(receiver))
+    }
+
     pub async fn subscribe<T: roslibrust_codegen::RosMessageType>(
         &self,
         topic_name: &str,
