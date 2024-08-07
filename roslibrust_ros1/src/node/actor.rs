@@ -29,6 +29,10 @@ pub enum NodeMsg {
     GetSubscriptions {
         reply: oneshot::Sender<Vec<(String, String)>>,
     },
+    GetDefinition {
+        reply: oneshot::Sender<String>,
+        topic: String,
+    },
     GetPublications {
         reply: oneshot::Sender<Vec<(String, String)>>,
     },
@@ -124,6 +128,16 @@ impl NodeServerHandle {
         let (sender, receiver) = oneshot::channel();
         self.node_server_sender
             .send(NodeMsg::GetSubscriptions { reply: sender })?;
+        Ok(receiver.await?)
+    }
+
+    /// Gets the message definition for a given topic
+    pub async fn get_definition(&self, topic: String) -> Result<String, NodeError> {
+        let (sender, receiver) = oneshot::channel();
+        self.node_server_sender.send(NodeMsg::GetDefinition {
+            reply: sender,
+            topic: topic,
+        })?;
         Ok(receiver.await?)
     }
 
@@ -491,6 +505,17 @@ impl Node {
                             (topic_name.clone(), subscription.topic_type().to_owned())
                         })
                         .collect(),
+                );
+            }
+            NodeMsg::GetDefinition { reply, topic } => {
+                let _ = reply.send(
+                    self.subscriptions
+                        .get(&topic)
+                        .unwrap()
+                        .responded_definition
+                        .read()
+                        .await
+                        .clone(),
                 );
             }
             NodeMsg::GetPublications { reply } => {
