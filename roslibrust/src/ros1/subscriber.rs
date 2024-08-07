@@ -56,7 +56,7 @@ pub struct Subscription {
     subscription_tasks: Vec<ChildTask<()>>,
     _msg_receiver: broadcast::Receiver<Vec<u8>>,
     msg_sender: broadcast::Sender<Vec<u8>>,
-    connection_header: ConnectionHeader,
+    pub connection_header: ConnectionHeader,
     known_publishers: Arc<RwLock<Vec<String>>>,
 }
 
@@ -114,21 +114,23 @@ impl Subscription {
         if is_new_connection {
             let node_name = self.connection_header.caller_id.clone();
             let topic_name = self.connection_header.topic.as_ref().unwrap().clone();
-            let connection_header = self.connection_header.clone();
+            let mut connection_header = self.connection_header.clone();
             let sender = self.msg_sender.clone();
             let publisher_list = self.known_publishers.clone();
             let publisher_uri = publisher_uri.to_owned();
 
-            let handle = tokio::spawn(async move {
-                if let Ok(mut stream) = establish_publisher_connection(
-                    &node_name,
-                    &topic_name,
-                    &publisher_uri,
-                    connection_header,
-                )
-                .await
-                {
-                    publisher_list.write().await.push(publisher_uri.to_owned());
+            if let Ok(mut stream) = establish_publisher_connection(
+                &node_name,
+                &topic_name,
+                &publisher_uri,
+                &mut connection_header,
+            )
+            .await
+            {
+                self.connection_header.msg_definition = connection_header.msg_definition;
+                publisher_list.write().await.push(publisher_uri.to_owned());
+
+                let handle = tokio::spawn(async move {
                     // Repeatedly read from the stream until its dry
                     loop {
                         match tcpros::receive_body(&mut stream).await {
@@ -145,9 +147,9 @@ impl Subscription {
                             }
                         }
                     }
-                }
-            });
-            self.subscription_tasks.push(handle.into());
+                });
+                self.subscription_tasks.push(handle.into());
+            }
         }
 
         Ok(())
@@ -158,7 +160,7 @@ async fn establish_publisher_connection(
     node_name: &str,
     topic_name: &str,
     publisher_uri: &str,
-    conn_header: ConnectionHeader,
+    conn_header: &mut ConnectionHeader,
 ) -> Result<TcpStream, std::io::Error> {
     let publisher_channel_uri = send_topic_request(node_name, topic_name, publisher_uri).await?;
     let mut stream = TcpStream::connect(publisher_channel_uri).await?;
@@ -167,7 +169,17 @@ async fn establish_publisher_connection(
     stream.write_all(&conn_header_bytes[..]).await?;
 
     if let Ok(responded_header) = tcpros::receive_header(&mut stream).await {
-        if conn_header.md5sum == Some("*".to_string()) || conn_header.md5sum == responded_header.md5sum {
+        log::debug!("responded header {responded_header:?}");
+        if conn_header.md5sum == Some("*".to_string()) {
+            conn_header.msg_definition = responded_header.msg_definition;
+             log::debug!(
+                "Established connection with publisher for {:?}, updating definition to '{}'",
+                conn_header.topic,
+                conn_header.msg_definition,
+            );
+
+            Ok(stream)
+        } else if conn_header.md5sum == responded_header.md5sum {
             log::debug!(
                 "Established connection with publisher for {:?}",
                 conn_header.topic
