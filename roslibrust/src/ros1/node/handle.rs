@@ -11,7 +11,7 @@ use crate::{
 /// This class provides the user facing API for interacting with ROS.
 #[derive(Clone)]
 pub struct NodeHandle {
-    inner: NodeServerHandle,
+    pub inner: NodeServerHandle,
 }
 
 impl NodeHandle {
