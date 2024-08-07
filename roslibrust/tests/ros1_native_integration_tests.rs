@@ -69,6 +69,15 @@ mod tests {
             tokio::time::timeout(tokio::time::Duration::from_millis(250), subscriber.next()).await;
         let res = res.unwrap().unwrap().unwrap();
         assert!(res == vec![8, 0, 0, 0, 4, 0, 0, 0, 116, 101, 115, 116]);
+
+        // definitely have a definition after receiving 1 message
+        let definition = nh
+            .inner
+            .get_definition("/test_subscribe_any".to_string())
+            .await
+            .unwrap();
+        assert_eq!(definition, "string data");
+        log::info!("definition: '{definition}'");
     }
 
     #[test_log::test(tokio::test)]
