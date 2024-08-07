@@ -10,7 +10,7 @@ use roslibrust_common::ServiceFn;
 /// The last node handle dropped shuts down the node.
 #[derive(Clone)]
 pub struct NodeHandle {
-    inner: NodeServerHandle,
+    pub inner: NodeServerHandle,
 }
 
 impl NodeHandle {
