@@ -26,10 +26,14 @@ pub use serde::{de::DeserializeOwned, Deserialize, Serialize};
 pub use serde_big_array::BigArray;
 pub use smart_default::SmartDefault;
 
+pub trait GetRosMessage {
+    fn get_ros_message(data: Vec<u8>) -> Option<Result<Self, anyhow::Error>> where Self: Sized;
+}
+
 /// Fundamental traits for message types this crate works with
 /// This trait will be satisfied for any types generated with this crate's message_gen functionality
 pub trait RosMessageType:
-    'static + DeserializeOwned + Send + Serialize + Sync + Clone + Debug
+    'static + DeserializeOwned + Send + Serialize + Sync + Clone + Debug + GetRosMessage
 {
     /// Expected to be the combination pkg_name/type_name string describing the type to ros
     /// Example: std_msgs/Header
@@ -49,6 +53,12 @@ impl RosMessageType for () {
     const ROS_TYPE_NAME: &'static str = "";
     const MD5SUM: &'static str = "";
     const DEFINITION: &'static str = "";
+}
+
+impl GetRosMessage for () {
+    fn get_ros_message(data: Vec<u8>) -> Option<Result<(), anyhow::Error>> {
+        Some(Ok(()))
+    }
 }
 
 /// Fundamental traits for service types this crate works with

@@ -103,6 +103,16 @@ pub fn generate_struct(msg: MessageFile) -> Result<TokenStream, Error> {
             const MD5SUM: &'static str = #md5sum;
             const DEFINITION: &'static str = #raw_message_definition;
         }
+
+        impl ::roslibrust_codegen::GetRosMessage for #struct_name {
+            fn get_ros_message(data: Vec<u8>) -> Option<Result<#struct_name, anyhow::Error>> {
+                match serde_rosmsg::from_slice::<T>(&data[..]) {
+                    Ok(p) => Some(Ok(p)),
+                    Err(e) => Some(Err(e.into())),
+                }
+            }
+        }
+
     };
 
     // Only if we have constants append the impl

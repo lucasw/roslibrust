@@ -30,6 +30,7 @@ xml-rs = "0.8"
 # So that the generate code can find them, and users don't have to added dependencies themselves
 smart-default = "0.7"
 serde-big-array = "0.5"
+anyhow = "1.0.86"
 
 [dev-dependencies]
 env_logger = "0.10"

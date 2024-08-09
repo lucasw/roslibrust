@@ -1,3 +1,4 @@
+use crate::GetRosMessage;
 use crate::RosMessageType;
 
 /// Matches the integral ros1 type time, with extensions for ease of use
@@ -36,11 +37,28 @@ impl RosMessageType for Time {
     const DEFINITION: &'static str = "";
 }
 
+impl GetRosMessage for Time {
+    fn get_ros_message(data: Vec<u8>) -> Option<Result<Time, anyhow::Error>> {
+        // TODO(lucasw) how to get bytes into Time?
+        Some(Ok(Time { secs: 0, nsecs: 0 }))
+        /*match serde_rosmsg::from_slice::<Time>(&data[..]) {
+            Ok(p) => Some(Ok(p)),
+            Err(e) => Some(Err(e.into())),
+        }*/
+    }
+}
+
 // The equivalent of rospy AnyMsg or C++ ShapeShifter, subscribe_any() uses this type
 impl RosMessageType for Vec<u8> {
     const ROS_TYPE_NAME: &'static str = "*";
     const MD5SUM: &'static str = "*";
     const DEFINITION: &'static str = "";
+}
+
+impl GetRosMessage for Vec<u8> {
+    fn get_ros_message(data: Vec<u8>) -> Option<Result<Vec<u8>, anyhow::Error>> {
+        Some(Ok(data))
+    }
 }
 
 // TODO provide chrono conversions here behind a cfg flag

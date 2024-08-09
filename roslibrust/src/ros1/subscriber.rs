@@ -28,6 +28,7 @@ impl<T: RosMessageType> Subscriber<T> {
 
     // TODO(lucasw) have to call next_raw in order to get raw bytes from an Any
     // subscription type, trying to run deserialization on it will/should fail
+    /*
     pub async fn next_raw(&mut self) -> Option<Result<Vec<u8>, SubscriberError>> {
         let data = match self.receiver.recv().await {
             Ok(v) => v,
@@ -37,18 +38,23 @@ impl<T: RosMessageType> Subscriber<T> {
 
         Some(Ok(data))
     }
+    */
 
-    pub async fn next(&mut self) -> Option<Result<T, SubscriberError>> {
+    pub async fn next(&mut self) -> Option<Result<T, anyhow::Error>> {
         let data = match self.receiver.recv().await {
             Ok(v) => v,
             Err(RecvError::Closed) => return None,
-            Err(RecvError::Lagged(n)) => return Some(Err(SubscriberError::Lagged(n))),
+            Err(RecvError::Lagged(n)) => return Some(Err(SubscriberError::Lagged(n).into())),
         };
 
+        T::get_ros_message(data)
+
+        /*
         match serde_rosmsg::from_slice::<T>(&data[..]) {
             Ok(p) => Some(Ok(p)),
             Err(e) => Some(Err(e.into())),
         }
+        */
     }
 }
 
