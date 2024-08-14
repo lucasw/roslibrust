@@ -811,8 +811,8 @@ pub fn resolve_dependency_graph(
                 .iter()
                 .map(|item| format!("{}/{}", item.msg.package, item.msg.name))
                 .collect::<Vec<_>>();
-            bail!("Unable to resolve dependencies after reaching search limit.\n\
-                   The following messages have unresolved dependencies: {msg_names:?}\n\
+            bail!("Unable to resolve dependencies after reaching search limit ({MAX_PARSE_ITER_LIMIT}). \
+                   The following messages have unresolved dependencies: {msg_names:?} \
                    These messages likely depend on packages not found in the provided search paths.");
         }
     }
