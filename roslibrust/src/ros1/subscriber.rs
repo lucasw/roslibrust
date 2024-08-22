@@ -191,9 +191,9 @@ async fn establish_publisher_connection(
             conn_header.msg_definition = responded_header.msg_definition;
             conn_header.md5sum = responded_header.md5sum;
              log::debug!(
-                "Established connection with publisher for {:?}, updating definition to '{}', '{:?}'",
+                "Established connection with publisher for {:?}, updating definition, md5sum '{:?}'",
                 conn_header.topic,
-                conn_header.msg_definition,
+                // conn_header.msg_definition,
                 conn_header.md5sum,
             );
             Ok(stream)
