@@ -14,6 +14,77 @@ mod tests {
     );
 
     #[test_log::test(tokio::test)]
+    async fn test_high_hz() {
+        let nh = NodeHandle::new("http://localhost:11311", "test_high_hz")
+            .await
+            .unwrap();
+
+        // Create a publisher that is latching
+        let publisher = nh
+            .advertise::<std_msgs::String>("/test_high_hz", 1000, false)
+            .await
+            .unwrap();
+
+        // Create a subscriber that will connect to the publisher
+        let mut subscriber = nh
+            .subscribe::<std_msgs::String>("/test_high_hz", 1000)
+            .await
+            .unwrap();
+
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        let num_received_messages = std::sync::Arc::new(AtomicUsize::new(0));
+        {
+            let num_received_messages = num_received_messages.clone();
+            let _sub = tokio::spawn(async move {
+                // count received messages
+                loop {
+                    let _msg = subscriber.next().await.unwrap().unwrap();
+                    num_received_messages.fetch_add(1, Ordering::SeqCst);
+                }
+            });
+        }
+
+        // give time for subscriber to get set up
+        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+
+        let t_start = tokio::time::Instant::now();
+
+        let msg = std_msgs::String {
+            data: "test".to_owned(),
+        };
+
+        let mut num_published_messages = 0;
+        for i in 1..2001 {
+            let t0 = tokio::time::Instant::now();
+            // want to hit about 4000Hz, so publish 40 messages every 10 mes
+            // though this only gets to about 3500Hz
+            for _j in 0..80 {
+                publisher.publish(&msg).await.unwrap();
+                num_published_messages += 1;
+            }
+            // can't sleep less than 2ms?
+            tokio::time::sleep(tokio::time::Duration::from_millis(10) - t0.elapsed()).await;
+            let num_rx = num_received_messages.load(Ordering::SeqCst);
+            let elapsed = t_start.elapsed().as_secs_f64();
+            if i % 500 == 0 {
+                log::info!(
+                    "{:?}s rx {} / tx {}, {:.2}Hz",
+                    elapsed,
+                    num_rx,
+                    num_published_messages,
+                    num_published_messages as f64 / elapsed,
+                );
+            }
+        }
+
+        // Confirm we got the message we published
+        assert_eq!(
+            num_received_messages.load(Ordering::SeqCst),
+            num_published_messages
+        );
+    }
+
+    #[test_log::test(tokio::test)]
     async fn test_publish_any() {
         // publish a single message in raw bytes and test the received message is as expected
         let nh = NodeHandle::new("http://localhost:11311", "test_publish_any")
