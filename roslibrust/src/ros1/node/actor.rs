@@ -6,6 +6,7 @@ use crate::{
         service_client::ServiceClientLink,
         service_server::ServiceServerLink,
         subscriber::Subscription,
+        tcpros::ConnectionHeader,
         MasterClient, NodeError, ProtocolParams, ServiceClient, TypeErasedCallback,
     },
     RosLibRustError, ServiceFn,
@@ -32,8 +33,12 @@ pub enum NodeMsg {
     GetSubscriptions {
         reply: oneshot::Sender<Vec<(String, String)>>,
     },
-    GetDefinition {
-        reply: oneshot::Sender<String>,
+    // TODO(lucasw) there are as many connections as there are publishers on a topic
+    // does that get tracked here or does the first or most recent connection override the rest?
+    // Not too worried about multiple publishers on the same topic with different
+    // topic_types or md5sums, that should be an error (but where will it be caught?)
+    GetConnectionHeader {
+        reply: oneshot::Sender<ConnectionHeader>,
         topic: String,
     },
     GetPublications {
@@ -126,10 +131,13 @@ impl NodeServerHandle {
         Ok(receiver.await?)
     }
 
-    /// Gets the message definition for a given topic
-    pub async fn get_definition(&self, topic: String) -> Result<String, NodeError> {
+    /// Gets the connection header information useful for storing in a bag/mcap
+    pub async fn get_connection_header(
+        &self,
+        topic: String,
+    ) -> Result<ConnectionHeader, NodeError> {
         let (sender, receiver) = oneshot::channel();
-        self.node_server_sender.send(NodeMsg::GetDefinition {
+        self.node_server_sender.send(NodeMsg::GetConnectionHeader {
             reply: sender,
             topic: topic,
         })?;
@@ -499,16 +507,18 @@ impl Node {
                         .collect(),
                 );
             }
-            NodeMsg::GetDefinition { reply, topic } => {
-                let _ = reply.send(
-                    self.subscriptions
-                        .get(&topic)
-                        .unwrap()
-                        .responded_definition
-                        .read()
-                        .await
-                        .clone(),
-                );
+            // get the publisher connection header
+            // TODO(lucasw) multple publisher on this topic mean multiple headers
+            NodeMsg::GetConnectionHeader { reply, topic } => {
+                let connection_header = self
+                    .subscriptions
+                    .get(&topic)
+                    .unwrap()
+                    .publisher_connection_header
+                    .read()
+                    .await
+                    .clone();
+                let _ = reply.send(connection_header);
             }
             NodeMsg::GetPublications { reply } => {
                 let _ = reply.send(
