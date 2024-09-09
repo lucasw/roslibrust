@@ -143,9 +143,10 @@ mod tests {
         // definitely have a definition after receiving 1 message
         let definition = nh
             .inner
-            .get_definition("/test_subscribe_any".to_string())
+            .get_connection_header("/test_subscribe_any".to_string())
             .await
-            .unwrap();
+            .unwrap()
+            .msg_definition;
         assert_eq!(definition, "string data");
         log::info!("definition: '{definition}'");
     }
