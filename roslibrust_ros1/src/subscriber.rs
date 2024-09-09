@@ -84,8 +84,10 @@ pub struct Subscription {
     subscription_tasks: Vec<ChildTask<()>>,
     _msg_receiver: broadcast::Receiver<Vec<u8>>,
     msg_sender: broadcast::Sender<Vec<u8>>,
-    connection_header: ConnectionHeader,
-    pub responded_definition: Arc<RwLock<String>>,
+    pub connection_header: ConnectionHeader,
+    // TODO(lucasw) there's a connection header per-publisher, need to store all of them
+    // but also need to know which received message came from which publisher (and which header)
+    pub publisher_connection_header: Arc<RwLock<ConnectionHeader>>,
     known_publishers: Arc<RwLock<Vec<String>>>,
 }
 
@@ -115,9 +117,9 @@ impl Subscription {
             subscription_tasks: vec![],
             _msg_receiver: receiver,
             msg_sender: sender,
-            connection_header,
+            connection_header: connection_header.clone(),
             // TODO(lucasw) ought to be Some
-            responded_definition: Arc::new(RwLock::new("".to_string())),
+            publisher_connection_header: Arc::new(RwLock::new(connection_header)),
             known_publishers: Arc::new(RwLock::new(vec![])),
         }
     }
@@ -146,25 +148,28 @@ impl Subscription {
         if is_new_connection {
             let node_name = self.connection_header.caller_id.clone();
             let topic_name = self.connection_header.topic.as_ref().unwrap().clone();
-            let mut connection_header = self.connection_header.clone();
+            let connection_header = self.connection_header.clone();
             let sender = self.msg_sender.clone();
             let publisher_list = self.known_publishers.clone();
             let publisher_uri = publisher_uri.to_owned();
 
-            let responded_definition = self.responded_definition.clone();
             trace!("Creating new subscription connection for {publisher_uri} on {topic_name}");
+            let publisher_connection_header = self.publisher_connection_header.clone();
             let handle = tokio::spawn(async move {
-                if let Ok(mut stream) = establish_publisher_connection(
-                    &node_name,
-                    &topic_name,
-                    &publisher_uri,
-                    &mut connection_header,
-                )
-                .await
+                if let Ok((mut stream, new_publisher_connection_header)) =
+                    establish_publisher_connection(
+                        &node_name,
+                        &topic_name,
+                        &publisher_uri,
+                        &connection_header,
+                    )
+                    .await
                 {
                     // TODO(lucasw) this is going to cause races, unless only checked after
                     // receiving a message
-                    *responded_definition.write().await = connection_header.msg_definition;
+                    // TODO(lucasw) also with multiple publishers on this topic
+                    // this will only be the most recently received one
+                    *publisher_connection_header.write().await = new_publisher_connection_header;
                     publisher_list.write().await.push(publisher_uri.to_owned());
 
                     // Repeatedly read from the stream until its dry
@@ -206,8 +211,8 @@ async fn establish_publisher_connection(
     node_name: &str,
     topic_name: &str,
     publisher_uri: &str,
-    conn_header: &mut ConnectionHeader,
-) -> Result<TcpStream, std::io::Error> {
+    conn_header: &ConnectionHeader,
+) -> Result<(TcpStream, ConnectionHeader), std::io::Error> {
     let publisher_channel_uri = send_topic_request(node_name, topic_name, publisher_uri).await?;
     let mut stream = TcpStream::connect(publisher_channel_uri).await?;
 
@@ -217,22 +222,21 @@ async fn establish_publisher_connection(
     if let Ok(responded_header) = tcpros::receive_header(&mut stream).await {
         log::debug!("responded header {responded_header:?}");
         if conn_header.md5sum == Some("*".to_string()) {
-            conn_header.msg_definition = responded_header.msg_definition;
-            conn_header.md5sum = responded_header.md5sum;
-             log::debug!(
-                "Established connection with publisher for {:?}, updating definition, md5sum '{:?}'",
+            log::debug!(
+                "Established connection with publisher for {:?}, new definition, md5sum '{:?}'",
                 conn_header.topic,
-                // conn_header.msg_definition,
-                conn_header.md5sum,
+                // responded_header.msg_definition,
+                responded_header.md5sum,
             );
-            Ok(stream)
+            Ok((stream, responded_header))
         } else if conn_header.md5sum == responded_header.md5sum
-            || responded_header.md5sum == Some("*".to_string()) {
+            || responded_header.md5sum == Some("*".to_string())
+        {
             log::debug!(
                 "Established connection with publisher for {:?}",
                 conn_header.topic
             );
-            Ok(stream)
+            Ok((stream, responded_header))
         } else {
             log::error!(
                 "Tried to subscribe to {}, but md5sums do not match. Expected {:?}, received {:?}",
