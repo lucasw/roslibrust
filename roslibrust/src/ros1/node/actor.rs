@@ -169,7 +169,7 @@ impl NodeServerHandle {
     /// This will stop all ROS functionality and poison all NodeHandles connected
     /// to the underlying node server.
     // TODO this function should probably be pub(crate) and not pub?
-    pub(crate) fn shutdown(&self) -> Result<(), NodeError> {
+    pub fn shutdown(&self) -> Result<(), NodeError> {
         self.node_server_sender.send(NodeMsg::Shutdown)?;
         Ok(())
     }
