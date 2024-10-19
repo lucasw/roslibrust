@@ -217,6 +217,23 @@ impl Subscription {
     }
 }
 
+// TODO(lucasw) this isn't fully removing the subscription, but calling unregister_subscriber
+// manually does
+/*
+impl Drop for Subscription {
+    fn drop(&mut self) {
+        if let Some(topic_name) = &self.connection_header.topic {
+            log::info!("Dropping subscription for topic {topic_name}");
+            let nh = self.node_handle.clone();
+            let topic_name = topic_name.clone();
+            tokio::spawn(async move {
+                let _rv = nh.unregister_subscriber(&topic_name).await;
+            });
+        }
+    }
+}
+*/
+
 async fn establish_publisher_connection(
     node_name: &str,
     topic_name: &str,
