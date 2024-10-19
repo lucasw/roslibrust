@@ -754,7 +754,7 @@ impl Node {
         let err2 = self.subscriptions.remove(topic);
         if err1.is_err() || err2.is_none() {
             error!(
-                "Failure unregistering publisher: {err1:?}, {}",
+                "Failure unregistering subscriber: topic unregister: {err1:?}, subs remove: {}",
                 err2.is_none()
             );
             // MAJOR TODO: this is a terrible error type to return...
@@ -994,3 +994,20 @@ impl Drop for Node {
         self.shutdown();
     }
 }
+
+// TODO(lucasw) need to move this into drop for NodeHandle to make it work?
+/*
+impl Drop for Node {
+    fn drop(&mut self) {
+        // TODO(lucasw) collect() these keys instead of this
+        let mut sub_topics = Vec::new();
+        for key in self.subscriptions.keys() {
+            sub_topics.push(key.clone());
+        }
+        log::info!("unsubscribing from everything {sub_topics:?}");
+        for topic in sub_topics {
+            self.unregister_subscriber(&topic);
+        }
+    }
+}
+*/
