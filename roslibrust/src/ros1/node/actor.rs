@@ -69,6 +69,10 @@ pub enum NodeMsg {
         msg_definition: String,
         md5sum: String,
     },
+    UnregisterSubscriber {
+        reply: oneshot::Sender<Result<(), String>>,
+        topic: String,
+    },
     RegisterServiceClient {
         reply: oneshot::Sender<Result<ServiceClientLink, String>>,
         service: Name,
@@ -379,6 +383,20 @@ impl NodeServerHandle {
         })?)
     }
 
+    pub async fn unregister_subscriber(&self, topic: &str) -> Result<(), NodeError> {
+        let (sender, receiver) = oneshot::channel();
+        self.node_server_sender
+            .send(NodeMsg::UnregisterSubscriber {
+                reply: sender,
+                topic: topic.to_owned(),
+            })?;
+        let rx = receiver.await?;
+        rx.map_err(|err| {
+            warn!("Failure while unregistering subscriber: {err:?}");
+            NodeError::IoError(io::Error::from(io::ErrorKind::ConnectionAborted))
+        })
+    }
+
     // This function provides functionality for the Node's XmlRPC server
     // When an XmlRpc request for "requestTopic" comes in the xmlrpc server for the node calls this function
     // to marshal the response.
@@ -607,6 +625,13 @@ impl Node {
                     .map_err(|err| err.to_string()),
                 );
             }
+            NodeMsg::UnregisterSubscriber { reply, topic } => {
+                let _ = reply.send(
+                    self.unregister_subscriber(&topic)
+                        .await
+                        .map_err(|err| err.to_string()),
+                );
+            }
             NodeMsg::RegisterServiceClient {
                 reply,
                 service,
@@ -707,6 +732,7 @@ impl Node {
                     queue_size,
                     msg_definition.to_owned(),
                     md5sum.to_owned(),
+                    self.node_handle.clone(),
                 );
                 let current_publishers = self.client.register_subscriber(topic, topic_type).await?;
                 for publisher in current_publishers {
@@ -719,6 +745,24 @@ impl Node {
                 Ok(receiver)
             }
         }
+    }
+
+    async fn unregister_subscriber(&mut self, topic: &str) -> Result<(), NodeError> {
+        // Tell ros master we are no longer publishing this topic
+        let err1 = self.client.unregister_subscriber(topic).await;
+        // Remove the publication from our internal state
+        let err2 = self.subscriptions.remove(topic);
+        if err1.is_err() || err2.is_none() {
+            error!(
+                "Failure unregistering publisher: {err1:?}, {}",
+                err2.is_none()
+            );
+            // MAJOR TODO: this is a terrible error type to return...
+            return Err(NodeError::IoError(std::io::Error::from(
+                std::io::ErrorKind::AddrInUse,
+            )));
+        }
+        Ok(())
     }
 
     async fn register_publisher(
