@@ -8,14 +8,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     env_logger::init();
 
-    let nh = NodeHandle::new("http://localhost:11311", "listener_rs").await?;
-    let mut subscriber = nh.subscribe::<std_msgs::String>("/chatter", 1).await?;
+    {
+        let nh = NodeHandle::new("http://localhost:11311", "listener_rs").await?;
+        let mut subscriber = nh.subscribe::<std_msgs::String>("/chatter", 1).await?;
 
-    while let Some(msg) = subscriber.next().await {
-        if let Ok(msg) = msg {
-            log::info!("[/listener_rs] Got message: {}", msg.data);
+        loop {
+            tokio::select! {
+                _ = tokio::signal::ctrl_c() => {
+                    log::warn!("ctrl-c, exiting");
+                    break;
+                }
+                msg = subscriber.next() => {
+                    if let Some(Ok(msg)) = msg {
+                        log::info!("[/listener_rs] Got message: {}", msg.data);
+                    }
+                }
+            }
         }
     }
+    log::info!("done with subscribing, letting subscription unregister");
+    tokio::time::sleep(std::time::Duration::from_millis(50)).await;
 
     Ok(())
 }
