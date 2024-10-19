@@ -1,4 +1,4 @@
-use crate::{names::Name, tcpros::ConnectionHeader};
+use crate::{names::Name, node::actor::NodeServerHandle, tcpros::ConnectionHeader};
 use abort_on_drop::ChildTask;
 use log::*;
 use roslibrust_common::{RosMessageType, ShapeShifter};
@@ -89,6 +89,7 @@ pub struct Subscription {
     // but also need to know which received message came from which publisher (and which header)
     pub publisher_connection_header: Arc<RwLock<ConnectionHeader>>,
     known_publishers: Arc<RwLock<Vec<String>>>,
+    node_handle: NodeServerHandle,
 }
 
 impl Subscription {
@@ -99,6 +100,7 @@ impl Subscription {
         queue_size: usize,
         msg_definition: String,
         md5sum: String,
+        node_handle: NodeServerHandle,
     ) -> Self {
         let (sender, receiver) = broadcast::channel(queue_size);
         let connection_header = ConnectionHeader {
@@ -121,6 +123,7 @@ impl Subscription {
             // TODO(lucasw) ought to be Some
             publisher_connection_header: Arc::new(RwLock::new(connection_header)),
             known_publishers: Arc::new(RwLock::new(vec![])),
+            node_handle,
         }
     }
 
@@ -155,6 +158,7 @@ impl Subscription {
 
             trace!("Creating new subscription connection for {publisher_uri} on {topic_name}");
             let publisher_connection_header = self.publisher_connection_header.clone();
+            let nh_copy = self.node_handle.clone();
             let handle = tokio::spawn(async move {
                 if let Ok((mut stream, new_publisher_connection_header)) =
                     establish_publisher_connection(
@@ -189,6 +193,12 @@ impl Subscription {
                                 let send_result = sender.send(body);
                                 if let Err(err) = send_result {
                                     log::error!("Unable to send message data due to dropped channel, closing connection: {err}");
+                                    // unregister
+                                    log::info!("unregistering subscriber {topic_name}");
+                                    let topic = topic_name.clone();
+                                    tokio::spawn(async move {
+                                        let _ = nh_copy.unregister_subscriber(&topic).await;
+                                    });
                                     break;
                                 }
                             }

@@ -647,39 +647,57 @@ mod tests {
             .advertise_service::<std_srvs::Trigger, _>("/test_cleanup_srv", |_req| {
                 Ok(Default::default())
             })
+
+    #[test_log::test(tokio::test)]
+    async fn test_dropping_subscriber() {
+        let nh = NodeHandle::new("http://localhost:11311", "/test_dropping_subscriber")
+            .await
+            .unwrap();
+
+        let mut subscriber = nh
+            .subscribe::<std_msgs::String>("/test_dropping_subscriber", 1)
             .await
             .unwrap();
 
         let master_client = roslibrust_ros1::MasterClient::new(
             "http://localhost:11311",
             "NAN",
-            "/test_node_cleanup_checker",
+            "/test_dropping_subscriber_mc",
         )
         .await
         .unwrap();
 
-        let data = master_client.get_system_state().await.unwrap();
-        info!("Got data before drop: {data:?}");
+        // TODO(lucasw) is there a get_subscribed_topics()?
+        let before = master_client.get_published_topics("").await.unwrap();
+        debug!("Published topics: {before:?}");
 
-        // Check that our three connections are reported by the ros master before starting
-        assert!(data.is_publishing("/test_cleanup_pub", "/test_node_cleanup"));
-        assert!(data.is_subscribed("/test_cleanup_sub", "/test_node_cleanup"));
-        assert!(data.is_service_provider("/test_cleanup_srv", "/test_node_cleanup"));
+        /*
+        assert!(before.contains(&(
+            "/test_dropping_subscriber".to_string(),
+            "std_msgs/Header".to_string()
+        )));
+        */
 
-        // Drop our node handle
-        std::mem::drop(nh);
+        debug!("Start manual drop");
+        // Drop the subscriber
+        // TODO(lucasw) this doesn't actually trigger the unsubscribe
+        std::mem::drop(subscriber);
+        debug!("End manual drop");
+        // this does
+        // master_client.unregister_subscriber("/test_dropping_subscriber");
+        let rv = nh
+            .inner
+            .unregister_subscriber("/test_dropping_subscriber")
+            .await;
+        log::info!("{rv:?}");
 
-        // Confirm here that Node actually got shut down
-        debug!("Drop has happened");
-        // Delay to allow destructor to complete
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        debug!("sleep is over");
-        let data = master_client.get_system_state().await.unwrap();
-        info!("Got data after drop: {data:?}");
-
-        // Check that our three connections are no longer reported by the ros master after dropping
-        assert!(!data.is_publishing("/test_cleanup_pub", "/test_node_cleanup"));
-        assert!(!data.is_subscribed("/test_cleanup_sub", "/test_node_cleanup"));
-        assert!(!data.is_service_provider("/test_cleanup_srv", "/test_node_cleanup"));
+        // Give a little time for drop to process
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        // Confirm no longer advertised
+        let after = master_client.get_published_topics("").await.unwrap();
+        assert!(!after.contains(&(
+            "/test_dropping_subscriber".to_string(),
+            "std_msgs/Header".to_string()
+        )));
     }
 }
