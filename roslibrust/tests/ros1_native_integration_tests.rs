@@ -58,7 +58,7 @@ mod tests {
             // want to hit about 4000Hz, so publish 40 messages every 10 mes
             // though this only gets to about 3500Hz
             for _j in 0..80 {
-                publisher.publish(&msg).await.unwrap();
+                publisher.publish(&msg).unwrap();
                 num_published_messages += 1;
             }
             // can't sleep less than 2ms?
@@ -86,11 +86,11 @@ mod tests {
     #[test_log::test(tokio::test)]
     async fn test_publish_any() {
         // publish a single message in raw bytes and test the received message is as expected
-        let nh = NodeHandle::new("http://localhost:11311", "test_publish_any")
-            .await
-            .unwrap();
-
         {
+            let nh = NodeHandle::new("http://localhost:11311", "test_publish_any")
+                .await
+                .unwrap();
+
             let publisher = nh
                 .advertise_any(
                     "/test_publish_any",
@@ -116,21 +116,18 @@ mod tests {
             let msg = res.unwrap().unwrap().unwrap();
             assert_eq!(msg.data, "test");
         }
-        // have to drop everything except the node handle to make this unregister make the node
-        // unregister
-        let rv = nh.inner.unregister_subscriber("/test_publish_any").await;
-        log::info!("{rv:?}");
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        // allow time for unregistering
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     }
 
     #[test_log::test(tokio::test)]
     async fn test_subscribe_any() {
         // get a single message in raw bytes and test the bytes are as expected
-        let nh = NodeHandle::new("http://localhost:11311", "test_subscribe_any")
-            .await
-            .unwrap();
-
         {
+            let nh = NodeHandle::new("http://localhost:11311", "test_subscribe_any")
+                .await
+                .unwrap();
+
             let publisher = nh
                 .advertise::<std_msgs::String>("/test_subscribe_any", 1, true)
                 .await
@@ -160,9 +157,8 @@ mod tests {
             assert_eq!(definition, "string data");
             log::info!("definition: '{definition}'");
         }
-        let rv = nh.inner.unregister_subscriber("/test_subscribe_any").await;
-        log::info!("{rv:?}");
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        // allow time for unregistering
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
     }
 
     #[test_log::test(tokio::test)]
@@ -581,6 +577,41 @@ mod tests {
             .advertise_service::<std_srvs::Trigger, _>("/test_cleanup_srv", |_req| {
                 Ok(Default::default())
             })
+            .await
+            .unwrap();
+
+        let master_client = roslibrust::ros1::MasterClient::new(
+            "http://localhost:11311",
+            "NAN",
+            "/test_node_cleanup_checker",
+        )
+        .await
+        .unwrap();
+
+        let data = master_client.get_system_state().await.unwrap();
+        info!("Got data before drop: {data:?}");
+
+        // Check that our three connections are reported by the ros master before starting
+        assert!(data.is_publishing("/test_cleanup_pub", "/test_node_cleanup"));
+        assert!(data.is_subscribed("/test_cleanup_sub", "/test_node_cleanup"));
+        assert!(data.is_service_provider("/test_cleanup_srv", "/test_node_cleanup"));
+
+        // Drop our node handle
+        std::mem::drop(nh);
+
+        // Confirm here that Node actually got shut down
+        debug!("Drop has happened");
+        // Delay to allow destructor to complete
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+        debug!("sleep is over");
+        let data = master_client.get_system_state().await.unwrap();
+        info!("Got data after drop: {data:?}");
+
+        // Check that our three connections are no longer reported by the ros master after dropping
+        assert!(!data.is_publishing("/test_cleanup_pub", "/test_node_cleanup"));
+        assert!(!data.is_subscribed("/test_cleanup_sub", "/test_node_cleanup"));
+        assert!(!data.is_service_provider("/test_cleanup_srv", "/test_node_cleanup"));
+    }
 
     #[test_log::test(tokio::test)]
     async fn test_dropping_subscriber() {
@@ -588,7 +619,7 @@ mod tests {
             .await
             .unwrap();
 
-        let mut subscriber = nh
+        let subscriber = nh
             .subscribe::<std_msgs::String>("/test_dropping_subscriber", 1)
             .await
             .unwrap();
