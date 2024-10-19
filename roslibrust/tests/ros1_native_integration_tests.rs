@@ -91,29 +91,37 @@ mod tests {
             .await
             .unwrap();
 
-        let publisher = nh
-            .advertise_any(
-                "/test_publish_any",
-                "std_msgs/String",
-                "string data\n",
-                1,
-                true,
-            )
-            .await
-            .unwrap();
+        {
+            let publisher = nh
+                .advertise_any(
+                    "/test_publish_any",
+                    "std_msgs/String",
+                    "string data\n",
+                    1,
+                    true,
+                )
+                .await
+                .unwrap();
 
-        let mut subscriber = nh
-            .subscribe::<std_msgs::String>("/test_publish_any", 1)
-            .await
-            .unwrap();
+            let mut subscriber = nh
+                .subscribe::<std_msgs::String>("/test_publish_any", 1)
+                .await
+                .unwrap();
 
-        let msg_raw: Vec<u8> = vec![8, 0, 0, 0, 4, 0, 0, 0, 116, 101, 115, 116].to_vec();
-        publisher.publish(&msg_raw).await.unwrap();
+            let msg_raw: Vec<u8> = vec![8, 0, 0, 0, 4, 0, 0, 0, 116, 101, 115, 116].to_vec();
+            publisher.publish(&msg_raw).await.unwrap();
 
-        let res =
-            tokio::time::timeout(tokio::time::Duration::from_millis(250), subscriber.next()).await;
-        let msg = res.unwrap().unwrap().unwrap();
-        assert_eq!(msg.data, "test");
+            let res =
+                tokio::time::timeout(tokio::time::Duration::from_millis(250), subscriber.next())
+                    .await;
+            let msg = res.unwrap().unwrap().unwrap();
+            assert_eq!(msg.data, "test");
+        }
+        // have to drop everything except the node handle to make this unregister make the node
+        // unregister
+        let rv = nh.inner.unregister_subscriber("/test_publish_any").await;
+        log::info!("{rv:?}");
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
 
     #[test_log::test(tokio::test)]
@@ -123,34 +131,40 @@ mod tests {
             .await
             .unwrap();
 
-        let publisher = nh
-            .advertise::<std_msgs::String>("/test_subscribe_any", 1, true)
-            .await
-            .unwrap();
+        {
+            let publisher = nh
+                .advertise::<std_msgs::String>("/test_subscribe_any", 1, true)
+                .await
+                .unwrap();
 
-        let mut subscriber = nh.subscribe_any("/test_subscribe_any", 1).await.unwrap();
+            let mut subscriber = nh.subscribe_any("/test_subscribe_any", 1).await.unwrap();
 
-        publisher
-            .publish(&std_msgs::String {
-                data: "test".to_owned(),
-            })
-            .await
-            .unwrap();
+            publisher
+                .publish(&std_msgs::String {
+                    data: "test".to_owned(),
+                })
+                .await
+                .unwrap();
 
-        let res =
-            tokio::time::timeout(tokio::time::Duration::from_millis(250), subscriber.next()).await;
-        let res = res.unwrap().unwrap().unwrap();
-        assert!(res == vec![8, 0, 0, 0, 4, 0, 0, 0, 116, 101, 115, 116]);
+            let res =
+                tokio::time::timeout(tokio::time::Duration::from_millis(250), subscriber.next())
+                    .await;
+            let res = res.unwrap().unwrap().unwrap();
+            assert!(res == vec![8, 0, 0, 0, 4, 0, 0, 0, 116, 101, 115, 116]);
 
-        // definitely have a definition after receiving 1 message
-        let definition = nh
-            .inner
-            .get_connection_header("/test_subscribe_any".to_string())
-            .await
-            .unwrap()
-            .msg_definition;
-        assert_eq!(definition, "string data");
-        log::info!("definition: '{definition}'");
+            // definitely have a definition after receiving 1 message
+            let definition = nh
+                .inner
+                .get_connection_header("/test_subscribe_any".to_string())
+                .await
+                .unwrap()
+                .msg_definition;
+            assert_eq!(definition, "string data");
+            log::info!("definition: '{definition}'");
+        }
+        let rv = nh.inner.unregister_subscriber("/test_subscribe_any").await;
+        log::info!("{rv:?}");
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
     }
 
     #[test_log::test(tokio::test)]
