@@ -394,6 +394,25 @@ impl NodeServerHandle {
         })
     }
 
+    pub async fn unregister_all_subscribers(&self) {
+        let subs = self.get_subscriptions().await;
+        match subs {
+            Ok(subs) => {
+                log::info!(
+                    "unregistering {} subscriptions in the node handle",
+                    subs.len()
+                );
+                for (topic_name, _topic_type) in subs {
+                    let rv = self.unregister_subscriber(&topic_name).await;
+                    log::info!("unregistered '{topic_name}': {rv:?}");
+                }
+            }
+            Err(error) => {
+                log::error!("couldn't unregister subscriptions {error:?}");
+            }
+        }
+    }
+
     // This function provides functionality for the Node's XmlRPC server
     // When an XmlRpc request for "requestTopic" comes in the xmlrpc server for the node calls this function
     // to marshal the response.

@@ -182,6 +182,11 @@ impl NodeHandle {
         });
         Ok(())
     }
+
+    // this will force every subscriber waiting in recv to return an error
+    pub async fn unregister_all_subscribers(&mut self) {
+        self.inner.unregister_all_subscribers().await;
+    }
 }
 
 impl Drop for NodeHandle {
@@ -190,22 +195,7 @@ impl Drop for NodeHandle {
         // whatever did the drop needs to stay around for long enough for this to complete
         let node_server_handle = self.inner.clone();
         tokio::spawn(async move {
-            let subs = node_server_handle.get_subscriptions().await;
-            match subs {
-                Ok(subs) => {
-                    log::info!(
-                        "unregistering {} subscriptions in the node handle",
-                        subs.len()
-                    );
-                    for (topic_name, _topic_type) in subs {
-                        let rv = node_server_handle.unregister_subscriber(&topic_name).await;
-                        log::info!("unregistered '{topic_name}': {rv:?}");
-                    }
-                }
-                Err(error) => {
-                    log::error!("couldn't unregister subscriptions {error:?}");
-                }
-            }
+            node_server_handle.unregister_all_subscribers().await;
         });
     }
 }
