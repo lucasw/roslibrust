@@ -851,6 +851,7 @@ impl Node {
         let err1 = self.client.unregister_publisher(topic).await;
         // Remove the publication from our internal state
         let err2 = self.publishers.remove(topic);
+        log::info!("unregistering {topic} {err1:?}");
         if err1.is_err() || err2.is_none() {
             error!(
                 "Failure unregistering publisher: {err1:?}, {}",
