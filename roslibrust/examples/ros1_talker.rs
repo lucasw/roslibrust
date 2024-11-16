@@ -15,14 +15,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .advertise::<geometry_msgs::PointStamped>("/my_point", 1, false)
         .await?;
 
-    for count in 0..50 {
+    let mut count = 0;
+    loop {
         let mut msg = geometry_msgs::PointStamped::default();
-        msg.point.x = count as f64;
+        msg.header.seq = count;
+        msg.point.x = ((count as f64) / 200.0).sin();
         publisher.publish(&msg).await?;
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
+        count += 1;
     }
 
-    Ok(())
+    // Ok(())
 }
 
 #[cfg(not(feature = "ros1"))]
