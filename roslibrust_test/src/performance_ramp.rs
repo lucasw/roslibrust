@@ -43,7 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 step: 5760,
                 data,
             };
-            publisher.publish(&image).await.unwrap();
+            publisher.publish(&image).unwrap();
             // Send at 10Hz
             tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
         }

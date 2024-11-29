@@ -36,7 +36,7 @@ mod tests {
             .unwrap();
 
         let msg_raw: Vec<u8> = vec![8, 0, 0, 0, 4, 0, 0, 0, 116, 101, 115, 116].to_vec();
-        publisher.publish(&msg_raw).await.unwrap();
+        publisher.publish(&msg_raw).unwrap();
 
         let res =
             tokio::time::timeout(tokio::time::Duration::from_millis(250), subscriber.next()).await;
@@ -62,7 +62,6 @@ mod tests {
             .publish(&std_msgs::String {
                 data: "test".to_owned(),
             })
-            .await
             .unwrap();
 
         let res =
@@ -88,7 +87,6 @@ mod tests {
             .publish(&std_msgs::String {
                 data: "test".to_owned(),
             })
-            .await
             .unwrap();
 
         // Create a subscriber that will connect to the publisher
@@ -120,7 +118,6 @@ mod tests {
             .publish(&std_msgs::String {
                 data: "test".to_owned(),
             })
-            .await
             .unwrap();
 
         let mut subscriber = nh
@@ -159,7 +156,6 @@ mod tests {
                 .publish(&test_msgs::RoundTripArrayRequest {
                     bytes: bytes.clone(),
                 })
-                .await
                 .unwrap();
 
             match subscriber.next().await {

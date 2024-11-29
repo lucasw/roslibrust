@@ -34,7 +34,7 @@ async fn main() -> Result<(), anyhow::Error> {
     // This will publish "hello" in a loop at 1Hz
     // `rostopic echo /chatter` will show the message being published
     loop {
-        publisher.publish(&data).await?;
+        publisher.publish(&data)?;
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
 }

@@ -44,8 +44,7 @@ impl<T: RosMessageType> Publisher<T> {
     }
 
     /// Queues a message to be sent on the related topic.
-    // TODO Major this no longer needs to be (or should be) async
-    pub async fn publish(&self, data: &T) -> Result<(), PublisherError> {
+    pub fn publish(&self, data: &T) -> Result<(), PublisherError> {
         let data = roslibrust_serde_rosmsg::to_vec(&data)?;
         // TODO this is a pretty dumb...
         // because of the internal channel used for re-direction this future doesn't
@@ -92,8 +91,7 @@ impl PublisherAny {
     /// This expects the data to be the raw bytes of the message body as they would appear going over the wire.
     /// See ros1_publish_any.rs example for more details.
     /// Body length should be included as first four bytes.
-    // TODO this no longer needs to be (or should be) async
-    pub async fn publish(&self, data: &Vec<u8>) -> Result<(), PublisherError> {
+    pub fn publish(&self, data: &Vec<u8>) -> Result<(), PublisherError> {
         // TODO this is a pretty dumb...
         // because of the internal channel used for re-direction this future doesn't
         // actually complete when the data is sent, but merely when it is queued to be sent

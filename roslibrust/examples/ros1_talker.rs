@@ -21,7 +21,7 @@ async fn main() -> Result<(), anyhow::Error> {
     for count in 0..50 {
         let mut msg = geometry_msgs::PointStamped::default();
         msg.point.x = count as f64;
-        publisher.publish(&msg).await?;
+        publisher.publish(&msg)?;
         tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 
