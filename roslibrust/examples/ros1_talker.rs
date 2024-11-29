@@ -22,7 +22,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let time = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .expect("time went backwards");
-        msg.header.stamp = roslibrust_codegen::Time { secs: time.as_secs() as u32, nsecs: time.subsec_nanos() };
+        msg.header.stamp = roslibrust_codegen::Time { secs: time.as_secs() as i32, nsecs: time.subsec_nanos() as i32 };
         msg.point.x = ((count as f64) / 200.0).sin();
         publisher.publish(&msg).await?;
         tokio::time::sleep(tokio::time::Duration::from_millis(5)).await;
