@@ -59,7 +59,7 @@ mod tests {
             // want to hit about 4000Hz, so publish 40 messages every 10 mes
             // though this only gets to about 3500Hz
             for _j in 0..80 {
-                publisher.publish(&msg).unwrap();
+                publisher.publish(&msg).await.unwrap();
                 num_published_messages += 1;
             }
             // can't sleep less than 2ms?
