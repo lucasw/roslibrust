@@ -189,7 +189,7 @@ impl<'a> CodeGenerator<'a> {
 }
 
 /// Create a code generator for C++ headers.
-pub fn make_cpp_generator<P: AsRef<Path>>(search_paths: &[P]) -> std::io::Result<CodeGenerator> {
+pub fn make_cpp_generator<P: AsRef<Path>>(search_paths: &[P]) -> std::io::Result<CodeGenerator<'_>> {
     CodeGeneratorBuilder::new(search_paths, cpp::MESSAGE_HEADER_TMPL)
         .add_type_mapping(ROS_TYPE_TO_CPP_TYPE_MAP.clone())
         .service_template(cpp::SERVICE_HEADER_TMPL)
