@@ -23,7 +23,8 @@ abort-on-drop = "0.2"
 test-log = { workspace = true }
 
 # These are definitely needed by this crate:
-reqwest = { version = "0.11" }
+# rustls avoids issue with cross compiling openssl
+reqwest = { version = "0.11", default-features = false, features = ["rustls-tls"] }
 serde_xmlrpc = { version = "0.2" }
 roslibrust_serde_rosmsg = { workspace = true }
 hyper = { version = "0.14", features = ["server"] }
